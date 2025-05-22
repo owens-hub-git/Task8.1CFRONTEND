@@ -1,6 +1,7 @@
 package com.example.task81candroidappexample;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -8,58 +9,84 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.Request;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
     private EditText chatInputBox;
     private Button sendButton;
-    private TextView responseText;
+    private RecyclerView chatRecyclerView;
+
+    private List<Message> chatMessages;
+    private ChatAdapter chatAdapter;
     private ProgressBar progressBar;
+
+    private String username = "User"; // can be updated with getIntent().getStringExtra("USERNAME")
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_main); // your layout must contain RecyclerView + input
 
         chatInputBox = findViewById(R.id.chatInputBox);
         sendButton = findViewById(R.id.sendButton);
-        responseText = findViewById(R.id.responseText);
-        progressBar = findViewById(R.id.progressBar);
+        chatRecyclerView = findViewById(R.id.chatRecyclerView);
+
+        //username
+        username = getIntent().getStringExtra("USERNAME");
+
+        chatMessages = new ArrayList<>();
+        chatAdapter = new ChatAdapter(chatMessages);
+
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        layoutManager.setStackFromEnd(true); // keep scroll at bottom
+        chatRecyclerView.setLayoutManager(layoutManager);
+        chatRecyclerView.setAdapter(chatAdapter);
+
+
+        chatMessages.add(new Message("Hello, " + username + "!", false));
+        chatAdapter.notifyItemInserted(chatMessages.size() - 1);
 
         sendButton.setOnClickListener(v -> sendMessage());
     }
 
     private void sendMessage() {
         String userMessage = chatInputBox.getText().toString().trim();
-        if (userMessage.isEmpty()) {
-            Toast.makeText(this, "Please enter a message", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        if (userMessage.isEmpty()) return;
 
-        // Show ProgressBar and clear previous response
-        progressBar.setVisibility(View.VISIBLE);
-        responseText.setText("");
-//        chatInputBox.setText("");
 
-        String url = "http://10.0.2.2:5000/chat"; // Update to machine IP for physical device
+        chatMessages.add(new Message(userMessage, true));
+        chatAdapter.notifyItemInserted(chatMessages.size() - 1);
+        chatRecyclerView.scrollToPosition(chatMessages.size() - 1);
+        chatInputBox.setText("");
+
+        // Backend URL
+        String url = "http://10.0.2.2:5000/chat";
+
+
         StringRequest request = new StringRequest(Request.Method.POST, url,
                 response -> {
-                    // Hide ProgressBar and show response
-                    progressBar.setVisibility(View.GONE);
-                    String botMessage = response.trim();
-                    responseText.setText(botMessage);
+                    chatMessages.add(new Message(response.trim(), false)); // bot reply
+                    chatAdapter.notifyItemInserted(chatMessages.size() - 1);
+                    chatRecyclerView.scrollToPosition(chatMessages.size() - 1);
                 },
                 error -> {
-                    // Hide ProgressBar and show error
-                    progressBar.setVisibility(View.GONE);
-                    String errorMessage = "Error connecting to server";
-                    Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show();
+                    String err = "Error: " + error.toString();
+                    chatMessages.add(new Message(err, false));
+                    chatAdapter.notifyItemInserted(chatMessages.size() - 1);
+                    chatRecyclerView.scrollToPosition(chatMessages.size() - 1);
+                    Log.e("VolleyError", err);
                 }
         ) {
             @Override
@@ -78,4 +105,5 @@ public class MainActivity extends AppCompatActivity {
 
         Volley.newRequestQueue(this).add(request);
     }
+
 }
